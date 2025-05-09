@@ -5,7 +5,7 @@ import numpy as np
 class Mujoco:
     def __init__(self, task_name, seed, render_mode=None):
         self.rng = np.random.default_rng(seed)
-        self.env = gym.make(task_name + "-v5", render_mode=render_mode)
+        self.env = gym.make(task_name + "-v4", render_mode=render_mode)
         self.observation_dim = self.env.observation_space.shape[0]
         self.action_dim = self.env.action_space.shape[0]
 
