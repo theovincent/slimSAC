@@ -157,8 +157,8 @@ class SAC:
 
         q_values = q_values.squeeze(-1)
         # shape (batch_size, 2)
-        next_q_values_double = jax.vmap(self.critic.apply, in_axes=(0, None, None, None), out_axes=1)(
-            critic_target_params, samples.next_state, next_actions, True
+        next_q_values_double = jax.vmap(self.critic.apply, in_axes=(0, None, None), out_axes=1)(
+            critic_target_params, samples.next_state, next_actions
         )
         next_q_values = jnp.min(next_q_values_double.squeeze(-1), axis=1)
         targets_ = self.compute_target(samples, next_q_values, jnp.exp(log_ent_coef), next_log_probs)
@@ -178,8 +178,8 @@ class SAC:
         actions, log_probs = self.actor.apply(actor_params, samples.state, noise_key=key)
 
         # shape (batch_size, 2)
-        q_value_double = jax.vmap(self.critic.apply, in_axes=(0, None, None, None), out_axes=1)(
-            critic_params, samples.state, actions, True
+        q_value_double = jax.vmap(self.critic.apply, in_axes=(0, None, None), out_axes=1)(
+            critic_params, samples.state, actions
         )
         # shape (batch_size)
         q_values = jnp.min(q_value_double, axis=1)
