@@ -1,11 +1,33 @@
 import gymnasium as gym
+from dm_control import suite
 import numpy as np
+from gymnasium import spaces
+from gymnasium.wrappers import FlattenObservation
+from shimmy import DmControlCompatibilityV0 as DmControltoGymnasium
 
 
-class Mujoco:
-    def __init__(self, task_name, seed, render_mode=None):
+def make_dmc_env(
+    env_name: str,
+    seed: int,
+    flatten: bool = True,
+) -> gym.Env:
+    domain_name, task_name = env_name.split("-")
+    env = suite.load(
+        domain_name=domain_name,
+        task_name=task_name,
+        task_kwargs={"random": seed},
+    )
+    env = DmControltoGymnasium(env, render_mode="rgb_array")
+    if flatten and isinstance(env.observation_space, spaces.Dict):
+        env = FlattenObservation(env)
+
+    return env
+
+
+class DMC:
+    def __init__(self, task_name, seed):
         self.rng = np.random.default_rng(seed)
-        self.env = gym.make(task_name + "-v5", render_mode=render_mode)
+        self.env = make_dmc_env(task_name, seed)
         self.observation_dim = self.env.observation_space.shape[0]
         self.action_dim = self.env.action_space.shape[0]
         self.env.action_space.seed(seed)
