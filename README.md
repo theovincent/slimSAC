@@ -28,14 +28,14 @@ We recommend python 3.11.5
 In the folder where the code is, create a Python virtual environment, activate it, update pip and install the package and its dependencies in editable mode:
 CPU installation:
 ```bash
-python3.11 -m venv env_cpu 
+python3 -m venv env_cpu 
 source env_cpu/bin/activate
 pip install --upgrade pip setuptools wheel
 pip install -e .[dev]
 ```
 GPU installation:
 ```bash
-python3.11 -m venv env_gpu 
+python3 -m venv env_gpu 
 source env_gpu/bin/activate
 pip install --upgrade pip setuptools wheel
 pip install -e .[dev,gpu]
