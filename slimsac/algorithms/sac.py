@@ -145,10 +145,10 @@ class SAC:
         next_actions, next_log_probs = self.actor.apply(actor_params, samples.next_state, key)
 
         # shape (batch_size, 2, 1)
-        q_values = jax.vmap(self.critic.apply, in_axes=(0, None, None), out_axes=1)(
+        q_values_ = jax.vmap(self.critic.apply, in_axes=(0, None, None), out_axes=1)(
             critic_params, samples.state, samples.action
         )
-        q_values = q_values.squeeze(axis=-1)
+        q_values = q_values_.squeeze(axis=-1)
 
         # shape (batch_size, 2, 1)
         next_q_values_double = jax.vmap(self.critic.apply, in_axes=(0, None, None), out_axes=1)(
@@ -175,11 +175,11 @@ class SAC:
         actions, log_probs = self.actor.apply(actor_params, samples.state, key)
 
         # shape (batch_size, 2, 1)
-        q_value_double = jax.vmap(self.critic.apply, in_axes=(0, None, None), out_axes=1)(
+        q_values_double = jax.vmap(self.critic.apply, in_axes=(0, None, None), out_axes=1)(
             critic_params, samples.state, actions
         )
         # shape (batch_size)
-        q_values = jnp.min(q_value_double.squeeze(axis=-1), axis=1)
+        q_values = jnp.min(q_values_double.squeeze(axis=-1), axis=1)
 
         losses = jnp.exp(log_ent_coef) * log_probs - q_values
         return losses.mean(), -log_probs.mean()
