@@ -1,5 +1,3 @@
-import numpy as np
-
 from slimsac.sample_collection.replay_buffer import ReplayBuffer, TransitionElement
 
 
@@ -29,24 +27,17 @@ def collect_single_sample(key, env, agent, rb: ReplayBuffer, p, n_training_steps
     return reward, episode_end
 
 
-def evaluate_policy(env, agent, p, n_episodes=1):
-    returns = []
-    lengths = []
+def evaluate_policy(env, agent, p):
+    env.reset()
+    episode_end = False
+    total_reward = 0.0
+    length = 0
 
-    for _ in range(n_episodes):
-        env.reset()
-        episode_end = False
-        total_reward = 0.0
-        length = 0
+    while not episode_end and length < p["horizon"]:
+        action = agent.sample_action(env.state, agent.actor_params, None)
+        reward, absorbing = env.step(action)
+        episode_end = absorbing or env.n_steps >= p["horizon"]
+        total_reward += reward
+        length += 1
 
-        while not episode_end and length < p["horizon"]:
-            action = agent.sample_action(env.state, agent.actor_params, key=None)
-            reward, absorbing = env.step(action)
-            episode_end = absorbing or env.n_steps >= p["horizon"]
-            total_reward += reward
-            length += 1
-
-        returns.append(total_reward)
-        lengths.append(length)
-
-    return np.mean(returns), np.mean(lengths)
+    return total_reward, length

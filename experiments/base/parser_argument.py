@@ -100,15 +100,8 @@ def add_base_arguments(parser: argparse.ArgumentParser):
         "-n",
         "--n_samples",
         type=int,
-        help="number of collected samples.",
+        help="Number of collected samples.",
         default=1_000_000,
-    )
-    parser.add_argument(
-        "-utd",
-        "--data_to_update",
-        help="Number of data points to collect per online Q-network update.",
-        type=float,
-        default=1,
     )
     parser.add_argument(
         "-fq",

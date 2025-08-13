@@ -8,7 +8,7 @@ import jax
 
 from experiments.base.sac import train
 from experiments.base.utils import prepare_logs
-from slimsac.environments.mujoco import Mujoco
+from slimsac.environments.dmc import DMC
 from slimsac.algorithms.sac import SAC
 from slimsac.sample_collection.replay_buffer import ReplayBuffer
 from slimsac.sample_collection.samplers import UniformSamplingDistribution
@@ -23,8 +23,8 @@ def run(argvs=sys.argv[1:]):
 
     q_key, train_key = jax.random.split(jax.random.PRNGKey(p["seed"]))
 
-    env = Mujoco(p["experiment_name"].split("_")[-1], p["seed"])
-    eval_env = Mujoco(p["experiment_name"].split("_")[-1], p["seed"])
+    env = DMC(p["experiment_name"].split("_")[-1], p["seed"])
+    eval_env = DMC(p["experiment_name"].split("_")[-1], p["seed"])
 
     rb = ReplayBuffer(
         sampling_distribution=UniformSamplingDistribution(p["seed"]),

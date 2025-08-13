@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 
-from slimsac.networks.architectures.sac import CriticNet, ActorNet
+from slimsac.algorithms.architectures.sac import CriticNet, ActorNet
 from slimsac.sample_collection.replay_buffer import ReplayBuffer, ReplayElement
 
 
@@ -17,12 +17,11 @@ class SAC:
         learning_rate: float,
         gamma: float,
         update_horizon: int,
-        data_to_update: int,
         tau: float,
         features_pi: list,
         features_qf: list,
     ):
-        self.key, actor_key, critic_key = jax.random.split(key, 3)
+        actor_key, critic_key = jax.random.split(key)
 
         obs = jnp.zeros(observation_dim, dtype=jnp.float32)
         action = jnp.zeros(action_dim, dtype=jnp.float32)
@@ -38,7 +37,7 @@ class SAC:
 
         # Actor
         self.actor = ActorNet(features_pi, action_dim)
-        self.actor_params = self.actor.init(actor_key, obs)
+        self.actor_params = self.actor.init(actor_key, obs, jax.random.PRNGKey(0))
         self.actor_optimizer = optax.adam(learning_rate)
         self.actor_optimizer_state = self.actor_optimizer.init(self.actor_params)
 
@@ -50,42 +49,40 @@ class SAC:
 
         self.gamma = gamma
         self.update_horizon = update_horizon
-        self.data_to_update = data_to_update
         self.tau = tau
 
         self.cumulated_critic_loss = 0
         self.cumulated_actor_loss = 0
         self.cumulated_entropy_loss = 0
 
-    def update_online_params(self, step: int, replay_buffer: ReplayBuffer, update_key):
-        if step % self.data_to_update == 0:
-            batch_samples = replay_buffer.sample()
+    def update_online_params(self, replay_buffer: ReplayBuffer, key):
+        batch_samples = replay_buffer.sample()
 
-            (
-                self.critic_params,
-                self.critic_target_params,
-                self.actor_params,
-                self.log_ent_coef,
-                self.critic_optimizer_state,
-                self.actor_optimizer_state,
-                self.entropy_optimizer_state,
-                self.cumulated_critic_loss,
-                self.cumulated_actor_loss,
-                self.cumulated_entropy_loss,
-            ) = self.learn_on_batch(
-                self.critic_params,
-                self.critic_target_params,
-                self.actor_params,
-                self.log_ent_coef,
-                self.critic_optimizer_state,
-                self.actor_optimizer_state,
-                self.entropy_optimizer_state,
-                self.cumulated_critic_loss,
-                self.cumulated_actor_loss,
-                self.cumulated_entropy_loss,
-                batch_samples,
-                update_key,
-            )
+        (
+            self.critic_params,
+            self.critic_target_params,
+            self.actor_params,
+            self.log_ent_coef,
+            self.critic_optimizer_state,
+            self.actor_optimizer_state,
+            self.entropy_optimizer_state,
+            self.cumulated_critic_loss,
+            self.cumulated_actor_loss,
+            self.cumulated_entropy_loss,
+        ) = self.learn_on_batch(
+            self.critic_params,
+            self.critic_target_params,
+            self.actor_params,
+            self.log_ent_coef,
+            self.critic_optimizer_state,
+            self.actor_optimizer_state,
+            self.entropy_optimizer_state,
+            self.cumulated_critic_loss,
+            self.cumulated_actor_loss,
+            self.cumulated_entropy_loss,
+            batch_samples,
+            key,
+        )
 
     @partial(jax.jit, static_argnames="self")
     def learn_on_batch(
@@ -94,34 +91,34 @@ class SAC:
         critic_target_params,
         actor_params,
         log_ent_coef,
-        critic_opt_state,
-        actor_opt_state,
-        entropy_opt_state,
+        critic_optimizer_state,
+        actor_optimizer_state,
+        entropy_optimizer_state,
         cumulated_critic_loss,
         cumulated_actor_loss,
         cumulated_entropy_loss,
         batch_samples,
-        update_key,
+        key,
     ):
-        critic_key, actor_key = jax.random.split(update_key, 2)
+        critic_key, actor_key = jax.random.split(key, 2)
 
         # Update critic
-        (critic_loss, batch_stats), critic_grads = jax.value_and_grad(self.critic_loss_on_batch, has_aux=True)(
+        critic_loss, critic_grads = jax.value_and_grad(self.critic_loss_on_batch)(
             critic_params, critic_target_params, actor_params, log_ent_coef, batch_samples, critic_key
         )
-        critic_updates, critic_opt_state = self.critic_optimizer.update(critic_grads, critic_opt_state)
+        critic_updates, critic_optimizer_state = self.critic_optimizer.update(critic_grads, critic_optimizer_state)
         critic_params = optax.apply_updates(critic_params, critic_updates)
 
         # Update actor
         (actor_loss, entropy), actor_grads = jax.value_and_grad(self.actor_loss_on_batch, has_aux=True)(
             actor_params, critic_params, log_ent_coef, batch_samples, actor_key
         )
-        actor_updates, actor_opt_state = self.actor_optimizer.update(actor_grads, actor_opt_state)
+        actor_updates, actor_optimizer_state = self.actor_optimizer.update(actor_grads, actor_optimizer_state)
         actor_params = optax.apply_updates(actor_params, actor_updates)
 
         # Update entropy coefficient
         entropy_loss, entropy_grads = jax.value_and_grad(self.entropy_loss)(log_ent_coef, entropy)
-        entropy_updates, entropy_opt_state = self.entropy_optimizer.update(entropy_grads, entropy_opt_state)
+        entropy_updates, entropy_optimizer_state = self.entropy_optimizer.update(entropy_grads, entropy_optimizer_state)
         log_ent_coef = optax.apply_updates(log_ent_coef, entropy_updates)
 
         # Update critic target
@@ -136,60 +133,64 @@ class SAC:
             critic_target_params,
             actor_params,
             log_ent_coef,
-            critic_opt_state,
-            actor_opt_state,
-            entropy_opt_state,
+            critic_optimizer_state,
+            actor_optimizer_state,
+            entropy_optimizer_state,
             cumulated_critic_loss,
             cumulated_actor_loss,
             cumulated_entropy_loss,
         )
 
-    def entropy_loss(self, log_ent_coef, entropy):
-        return jnp.exp(log_ent_coef) * (entropy - self.target_entropy)
-
     def critic_loss_on_batch(self, critic_params, critic_target_params, actor_params, log_ent_coef, samples, key):
-        next_actions, next_log_probs = self.actor.apply(actor_params, samples.next_state, noise_key=key)
+        next_actions, next_log_probs = self.actor.apply(actor_params, samples.next_state, key)
 
-        # shape (batch_size, 2) | (2, batch_stats)
-        q_values, batch_stats = jax.vmap(
-            partial(self.critic.apply, mutable=["batch_stats"]), in_axes=(0, None, None), out_axes=(1, 0)
-        )(critic_params, samples.state, samples.action)
+        # shape (batch_size, 2, 1)
+        q_values = jax.vmap(self.critic.apply, in_axes=(0, None, None), out_axes=1)(
+            critic_params, samples.state, samples.action
+        )
+        q_values = q_values.squeeze(axis=-1)
 
-        q_values = q_values.squeeze(-1)
-        # shape (batch_size, 2)
+        # shape (batch_size, 2, 1)
         next_q_values_double = jax.vmap(self.critic.apply, in_axes=(0, None, None), out_axes=1)(
             critic_target_params, samples.next_state, next_actions
         )
-        next_q_values = jnp.min(next_q_values_double.squeeze(-1), axis=1)
+        # shape (batch_size)
+        next_q_values = jnp.min(next_q_values_double.squeeze(axis=-1), axis=1)
+
+        # shape (batch_size)
         targets_ = self.compute_target(samples, next_q_values, jnp.exp(log_ent_coef), next_log_probs)
         # shape (batch_size, 2)
         targets = jnp.repeat(targets_[:, jnp.newaxis], 2, axis=1)
 
-        td_losses = jnp.square(q_values - targets)
-        return td_losses.mean(), batch_stats
+        return jnp.square(q_values - targets).mean()
 
-    def compute_target(self, sample: ReplayElement, next_q_value: jax.Array, entropy_coef, next_log_prob):
-        # shape of next_q_values (batch_size)
-        return sample.reward + (1 - sample.is_terminal) * (self.gamma**self.update_horizon) * (
-            next_q_value - entropy_coef * next_log_prob
+    def compute_target(
+        self, samples: ReplayElement, next_q_values: jax.Array, ent_coef: float, next_log_probs: jax.Array
+    ):
+        return samples.reward + (1 - samples.is_terminal) * (self.gamma**self.update_horizon) * (
+            next_q_values - ent_coef * next_log_probs
         )
 
     def actor_loss_on_batch(self, actor_params, critic_params, log_ent_coef, samples, key):
-        actions, log_probs = self.actor.apply(actor_params, samples.state, noise_key=key)
+        actions, log_probs = self.actor.apply(actor_params, samples.state, key)
 
-        # shape (batch_size, 2)
+        # shape (batch_size, 2, 1)
         q_value_double = jax.vmap(self.critic.apply, in_axes=(0, None, None), out_axes=1)(
             critic_params, samples.state, actions
         )
         # shape (batch_size)
-        q_values = jnp.min(q_value_double, axis=1)
+        q_values = jnp.min(q_value_double.squeeze(axis=-1), axis=1)
 
         losses = jnp.exp(log_ent_coef) * log_probs - q_values
         return losses.mean(), -log_probs.mean()
 
+    def entropy_loss(self, log_ent_coef, entropy):
+        return jnp.exp(log_ent_coef) * (entropy - self.target_entropy)
+
     @partial(jax.jit, static_argnames="self")
-    def sample_action(self, state, actor_params, key=None):
-        return self.actor.apply(actor_params, state, noise_key=key)[0]
+    def sample_action(self, state, actor_params, key):
+        # only return the action
+        return self.actor.apply(actor_params, state, key)[0]
 
     def get_logs(self):
         logs = {
