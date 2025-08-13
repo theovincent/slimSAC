@@ -42,7 +42,7 @@ class SAC:
         self.actor_optimizer_state = self.actor_optimizer.init(self.actor_params)
 
         # Entropy coefficient
-        self.log_ent_coef = jnp.array(np.log(1.0))
+        self.log_ent_coef = jnp.log(1.0)
         self.entropy_optimizer = optax.adam(learning_rate)
         self.entropy_optimizer_state = self.entropy_optimizer.init(self.log_ent_coef)
         self.target_entropy = -np.float32(action_dim)

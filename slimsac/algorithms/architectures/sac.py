@@ -30,21 +30,21 @@ class ActorNet(nn.Module):
             x = nn.Dense(n_units)(x)
             x = nn.relu(x)
 
-        mean = nn.Dense(self.action_dim)(x)
+        means = nn.Dense(self.action_dim)(x)
 
         if noise_key is None:  # deterministic
-            return mean, 1
+            return means, 1
         else:
-            log_std_unclipped = nn.Dense(self.action_dim)(x)
-            log_std = jnp.clip(log_std_unclipped, -20, 2)
-            std = jnp.exp(log_std)
+            log_stds_unclipped = nn.Dense(self.action_dim)(x)
+            log_stds = jnp.clip(log_stds_unclipped, -20, 2)
+            stds = jnp.exp(log_stds)
 
             noise = jax.random.normal(noise_key, shape=(self.action_dim,))
-            action_pre_tanh = mean + std * noise
+            action_pre_tanh = means + stds * noise
             action = jnp.tanh(action_pre_tanh)
 
             # Gaussian log-prob
-            log_prob_uncorrected = jax.scipy.stats.norm.logpdf(action_pre_tanh, mean, std * noise)
+            log_prob_uncorrected = jax.scipy.stats.norm.logpdf(action_pre_tanh, means, stds * noise)
             # d tanh^{-1}(y) / dy = 1 / (1 - y^2)
             log_prob = log_prob_uncorrected - jnp.log(1 - action**2 + 1e-6)
 
