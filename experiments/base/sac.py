@@ -32,7 +32,7 @@ def train(key: jax.random.PRNGKey, p: dict, agent: SAC, env, eval_env, rb: Repla
             episode_return = 0
             episode_length = 0
 
-        if n_training_steps >= p["learning_starts"]:
+        if n_training_steps >= p["n_initial_samples"]:
             agent.update_online_params(rb, update_key)
 
             if n_training_steps % 10_000 == 0:
