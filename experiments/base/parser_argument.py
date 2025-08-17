@@ -62,11 +62,11 @@ def add_base_arguments(parser: argparse.ArgumentParser):
         default=256,
     )
     parser.add_argument(
-        "-ls",
-        "--learning_starts",
-        help="How many samples to collect before training starts.",
+        "-nis",
+        "--n_initial_samples",
+        help="Number of initial samples before the training starts.",
         type=int,
-        default=5000,
+        default=5_000,
     )
     parser.add_argument(
         "-uh",
