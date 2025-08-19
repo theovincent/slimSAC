@@ -22,7 +22,7 @@ class CriticNet(nn.Module):
 class ActorNet(nn.Module):
     features: Sequence[int]
     action_dim: int
-    min_log_stds = -10
+    min_log_stds = -20
     max_log_stds = 2
 
     @nn.compact
